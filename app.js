@@ -1,229 +1,245 @@
 var express = require("express");
 var app = express();
 const path = require('path');
-var qs = require('querystring');
+//var qs = require('querystring');
 var tunnel = require('tunnel-ssh');
+var bodyParser = require('body-parser');
 var port = 3000;
 var randomstring = require("randomstring");
-
-
-
-var firSTname="";
-var laSTname="";
-var AGe="";
+var dateTime = require('node-datetime');
 
 app.use(function(req, res, next) {
-  res.header("Access-Control-Allow-Origin", "*");
-  res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
-  next();
+    res.header("Access-Control-Allow-Origin", "*");
+    res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
+    next();
 });
-
-var mongoose = require("mongoose");
-mongoose.Promise = global.Promise;
-
-var nameSchema = new mongoose.Schema({
-    firstName: String,
-    lastName: String
-});
-var User = mongoose.model("User", nameSchema);
-
 app.get("/", (req, res) => {
     res.sendFile(path.join(__dirname + '/index.html'));
 });
+var mongoose = require("mongoose");
+mongoose.Promise = global.Promise;
 
+app.use(bodyParser.json())
+
+var Schema = mongoose.Schema;
+
+var userSchema = new Schema({
+    _id: { type: Schema.ObjectId, auto: true },
+    fname: String,
+    lname: String,
+    contact: String,
+    email: String,
+    dob: String,
+    ticketNumber: String
+
+});
+
+var RMS_USER = mongoose.model("RMS_USER", userSchema);
+
+var config = {
+    username: 'bitnami',
+    host: 'mongoarsbrxalzt3eqvgs-vm0.westus.cloudapp.azure.com',
+    agent: process.env.SSH_AUTH_SOCK,
+    port: 22,
+    dstPort: 27017,
+    password: 'TintinHaddock21'
+};
+var travelSchema = new Schema({
+    _id: { type: Schema.ObjectId, auto: true },
+    userids: [{ type: Schema.Types.ObjectId, ref: 'RMS_USER' }],
+    source: String,
+    destination: String,
+    carrier: String,
+    traveldate: String,
+    startTime: String,
+    endTime: String,
+    carrierName: String,
+    pnr: String,
+    price: Number,
+    tax: Number,
+    bookingDate: String,
+    type:String,
+    associatedFlights:[{ type: Schema.ObjectId, auto: true }],
+    duration:String
+});
+var RMS_TRAVEL = mongoose.model("RMS_TRAVEL", travelSchema);
+global.db = null;
+
+//function createConnect() {
+var server = tunnel(config, function(error, server) {
+    if (error) {
+        console.log("SSH connection error: " + error);
+    }
+    mongoose.connect('mongodb://arsAdmin:' + encodeURIComponent('Password15$') + '@localhost:27017/ARS_DB', { useNewUrlParser: true });
+    db = mongoose.connection;
+    //console.log(db);
+});
+//}
 app.post("/addname", (request, res) => {
 
 
-if (request.method == 'POST') {
+    if (request.method == 'POST') {
         var body = '';
-        request.on('data', function (data) {
+        /*request.on('data', function(data) {
             body += data;
             // 1e6 === 1 * Math.pow(10, 6) === 1 * 1000000 ~~~ 1MB
-            if (body.length > 1e6) { 
+            if (body.length > 1e6) {
                 // FLOOD ATTACK OR FAULTY CLIENT, NUKE REQUEST
                 request.connection.destroy();
             }
-        });
-        request.on('end', function () {
+        });*/
+        console.log(request.body) // populated!
+        if (request.body != null) {
+            var pnrString = randomstring.generate(6);
+            var dt = dateTime.create();
+            var formatted = dt.format('m/d/Y');
+            console.log(formatted);
+            let paxArray = request.body.paxArray;
+            let user1 = "";
+            paxArray.forEach(function(pax) {
+                pax['ticketNumber'] = randomstring.generate(12);
+            });
 
-            var POST = qs.parse(body);
-            firSTname=POST.fname;
-            laSTname=POST.lname;
-            AGe=POST.age;
+            RMS_USER.insertMany(paxArray, function(err, docs) {
+                if (err) {
+                    return console.error(err);
+                } else {
+                    console.log("Multiple documents inserted to Collection");
+                    console.log(docs);
+                    user1 = docs[0];
+                    let idArr = [];
+                    docs.forEach(function(pax) {
+                        idArr.push(pax._id);
+                    });
+                    var travel = new RMS_TRAVEL({
+                        userids: idArr,
+                        source: request.body.source,
+                        destination: request.body.destination,
+                        carrier: request.body.carrier,
+                        traveldate: request.body.traveldate,
+                        startTime: request.body.startTime,
+                        endTime: request.body.endTime,
+                        carrierName: request.body.carrierName,
+                        pnr: pnrString,
+                        price: request.body.price,
+                        tax: 500,
+                        bookingDate: formatted,
+                        type:'one',
+                        duration:request.body.duration
+                    });
+                    db.collection('RMS_TRAVEL').insertOne(travel, function(err, doctravel) {
+                        if (err) {
+                            return console.error(err);
+                        } else {
+                            console.log("travel documents inserted to Collection");
+                            console.log(doctravel.ops[0]);
+                            res.json({
+                                "success": true,
+                                "firstname": user1.fname,
+                                "lastname": user1.lname,
+                                "pnr": doctravel.ops[0].pnr,
+                                "price": doctravel.ops[0].price,
+                                "source": doctravel.ops[0].source,
+                                "destination": doctravel.ops[0].destination,
+                                "carrier": doctravel.ops[0].carrier,
+                                "traveldate": doctravel.ops[0].traveldate,
+                                "startTime": doctravel.ops[0].startTime,
+                                "endTime": doctravel.ops[0].endTime,
+                                "carrierName": doctravel.ops[0].carrierName,
+                                "price": doctravel.ops[0].price,
+                                "tax": doctravel.ops[0].tax,
+                                "bookingDate": doctravel.ops[0].bookingDate,
+                                "type":doctravel.ops[0].type
+                            });
+                        }
+                    });
 
-console.log(POST);
-            var config = {
-    username:'bitnami',
-    host:'mongoarsbrxalzt3eqvgs-vm0.westus.cloudapp.azure.com',
-    agent : process.env.SSH_AUTH_SOCK,
-    port:22,
-    dstPort:27017,
-    password:'TintinHaddock21'
-};
+                }
+            });
+        }
+        /*var user1 = new RMS_USER({
+            fname: firSTname,
+            lname: laSTname,
+            contact: "12345678",
+            email: "abc@cognizant.com",
+            dob: "01/01/01"
+        });*/
+        request.on('end', function() {
 
-
-var server = tunnel(config, function (error, server) {
-    if(error){
-        console.log("SSH connection error: " + error);
-    }
-    mongoose.connect('mongodb://arsAdmin:'+encodeURIComponent('Password15$')+'@localhost:27017/ARS_DB')
-
-    var db = mongoose.connection;
-var Schema = mongoose.Schema;
- var userSchema = new Schema({
-     fname: String,
-     lname: String,
-     contact: String,
-     email: String,
-     dob:String
- });
- 
- var RMS_USER = mongoose.model("RMS_USER", userSchema);
- var pnrString = randomstring.generate(7);
- var ticketnumberString = randomstring.generate(12);
- 
- var user1 = new RMS_USER({
-     fname: firSTname,
-     lname: laSTname,
-     contact: "12345678",
-     email:"abc@cognizant.com",
-     dob:"01/01/01"
- });
-
-
-user1.save(function(error,user) {
-     console.log(user.id);
-     var Schema = mongoose.Schema;
- var travelSchema = new Schema({
-     userid: String,
-     source: String,
-     destination: String,
-     carrier: String,
-     traveldate:String,
-     pnr:String,
-     ticketNumber:String,
-     price:Number,
-     tax:Number,
-     bookingDate:String
- });
-var RMS_TRAVEL = mongoose.model("RMS_TRAVEL", travelSchema);
- var pnrString = randomstring.generate(7);
- var ticketnumberString = randomstring.generate(12);
- var dateTime = require('node-datetime');
-var dt = dateTime.create();
-var formatted = dt.format('m/d/Y');
-console.log(formatted);
- 
- var travel = new RMS_TRAVEL({
-     userid: user.id,
-     source: "CCU",
-     destination:"DEL",
-     carrier:"EY",
-     traveldate:"11/11/2018",
-     pnr:pnrString,
-     ticketNumber:ticketnumberString,
-     price:3000,
-     tax:500,
-     bookingDate:formatted
- });
-
- travel.save(function(error,user) {
-     res.send({firstname:firSTname,
-    lastname:laSTname, 
-    pnr:pnrString,
-    ticketnumber:ticketnumberString,
-    price:3000});
- mongoose.connection.close()
- });
-
-
-
-
-});
- if (error) {
-     console.error(error);
-  }
- });
-
-
-
- 
-
+            //console.log(request.body) // populated!
         });
     }
-
-
+    //  mongoose.connection.close();
 
 });
-
 app.get("/fetchDetails", (request, res) => {
-
-    var config = {
-    username:'bitnami',
-    host:'mongoarsbrxalzt3eqvgs-vm0.westus.cloudapp.azure.com',
-    agent : process.env.SSH_AUTH_SOCK,
-    port:22,
-    dstPort:27017,
-    password:'TintinHaddock21'
-};
+    // createConnect();
+    // console.log(db);
+    // console.log("llll");
+    var lname = request.query.lname;
+    var pnrString = request.query.pnr;
 
 
-var server = tunnel(config, function (error, server) {
+    db.collection('RMS_TRAVEL').findOne({ 'pnr': pnrString }, function(err, travel) {
+        if (err) return handleError(err);
+        else {
+            var useridArr = travel.userids;
+            console.log(useridArr);
+            let foundMatch = false;
+            useridArr.forEach(function(id) {
+                RMS_USER.findOne({ 'lname': lname, '_id': id }, function(err, user) {
+                    if (err) return handleError(err);
+                    if (user != null) {
+                        const userArr = RMS_USER.find()
+                            .where('_id')
+                            .in(useridArr)
+                            .exec(function(err, docs) {
+                                console.log(travel);
+                                res.send({
+                                    users: docs,
+                                    pnr: travel.pnr,
+                                    price: travel.price,
+                                    source: travel.source,
+                                    destination: travel.destination,
+                                    carrier: travel.carrier,
+                                    traveldate: travel.traveldate,
+                                    startTime: travel.startTime,
+                                    endTime: travel.endTime,
+                                    carrierName: travel.carrierName,
+                                    price: travel.price,
+                                    tax: travel.tax,
+                                    bookingDate: travel.bookingDate,
+                                    type:travel.type,
+                                    duration:travel.duration
+                                  
+                                });
+                                //make magic happen
+                            });
+                        /*db.collection('RMS_USER').find({ '_id': { '$in': ['5b82f90a2b75db011cffc5b7, 5b82f90a2b75db011cffc5b8'] } }).toArray(function(err, docs) {
+                            // docs array here contains all queried docs
+                            if (err) throw err;
+                            console.log(docs);
+                        });*/
 
-    mongoose.connect('mongodb://arsAdmin:'+encodeURIComponent('Password15$')+'@localhost:27017/ARS_DB')
 
-    var db = mongoose.connection;
-var Schema = mongoose.Schema;
-var pnrString = request.query.pnr;
-var lname = request.query.lname;
 
- var travelSchema = new Schema({
-     userid: String,
-     source: String,
-     destination: String,
-     carrier: String,
-     traveldate:String,
-     pnr:String,
-     ticketNumber:String,
-     price:Number,
-     tax:Number,
-     bookingDate:String
- });
+                    }
+                });
 
-var travel = mongoose.model('rms_travels', travelSchema);
+            });
 
-travel.findOne({ 'pnr': pnrString },  function (err, travel) {
-  if (err) return handleError(err);
-  console.log(travel);
-  var userid = travel.userid;
-   var userSchema = new Schema({
-     fname: String,
-     lname: String,
-     contact: String,
-     email: String,
-     dob:String
- });
+        }
+    });
+    // mongoose.connection.close();
 
- var user = mongoose.model('rms_users', userSchema);
- user.findOne({ '_id': userid,'lname': lname},  function (err, user) {
-  if (err) return handleError(err);
-  console.log(travel.source+"::::"+user.fname)
-  var source=travel.source;
-  var dest=travel.destination;
-  var fname=user.fname;
-  var lname=user.lname;
-  var pnr=travel.pnr;
-  var ticketNumber=travel.ticketNumber;
- res.send({firstname:fname,
-    lastname:lname, 
-    pnr:pnr,
-    ticketnumber:ticketNumber,
-    price:3000});
-mongoose.connection.close();
 });
-});
-});
-});
+var gracefulExit = function() { 
+    mongoose.connection.close(function () {
+      console.log('Mongoose default connection with DB :' + db + ' is disconnected through app termination');
+      process.exit(0);
+    });
+  }
+  process.on('SIGINT', gracefulExit).on('SIGTERM', gracefulExit);
 
 app.listen(port, () => {
     console.log("Server listening on port " + port);
