@@ -25,12 +25,13 @@ var Schema = mongoose.Schema;
 
 var userSchema = new Schema({
     _id: { type: Schema.ObjectId, auto: true },
-    fname: String,
-    lname: String,
+    firstName: String,
+    lastName: String,
     contact: String,
     email: String,
     dob: String,
-    ticketNumber: String
+    ticketNumber: String,
+    phnNo:String
 
 });
 
@@ -56,11 +57,15 @@ var travelSchema = new Schema({
     carrierName: String,
     pnr: String,
     price: Number,
-    tax: Number,
     bookingDate: String,
     type:String,
     associatedFlights:[{ type: Schema.ObjectId, auto: true }],
-    duration:String
+    duration:String,
+    taxAirport: Number,
+    taxFuel: Number,
+    chargeService:Number,
+    feesDevelopment:Number,
+    fop:String
 });
 var RMS_TRAVEL = mongoose.model("RMS_TRAVEL", travelSchema);
 global.db = null;
@@ -122,10 +127,15 @@ app.post("/addname", (request, res) => {
                         carrierName: request.body.carrierName,
                         pnr: pnrString,
                         price: request.body.price,
-                        tax: 500,
+                        taxAirport: request.body.taxAirport,
+                        taxFuel: request.body.taxFuel,
+                        chargeService:request.body.chargeService,
+                        feesDevelopment:request.body.feesDevelopment,
                         bookingDate: formatted,
                         type:'one',
-                        duration:request.body.duration
+                        duration:request.body.duration,
+                        fop:"cc"
+
                     });
                     db.collection('RMS_TRAVEL').insertOne(travel, function(err, doctravel) {
                         if (err) {
@@ -187,7 +197,7 @@ app.get("/fetchDetails", (request, res) => {
             console.log(useridArr);
             let foundMatch = false;
             useridArr.forEach(function(id) {
-                RMS_USER.findOne({ 'lname': lname, '_id': id }, function(err, user) {
+                RMS_USER.findOne({ 'lastName': lname, '_id': id }, function(err, user) {
                     if (err) return handleError(err);
                     if (user != null) {
                         const userArr = RMS_USER.find()
@@ -207,10 +217,15 @@ app.get("/fetchDetails", (request, res) => {
                                     endTime: travel.endTime,
                                     carrierName: travel.carrierName,
                                     price: travel.price,
-                                    tax: travel.tax,
+                                    taxAirport: travel.taxAirport,
+                                    taxFuel: travel.taxFuel,
+                                    chargeService:travel.chargeService,
+                                    feesDevelopment:travel.feesDevelopment,
                                     bookingDate: travel.bookingDate,
                                     type:travel.type,
-                                    duration:travel.duration
+                                    duration:travel.duration,
+                                    fop:travel.fop
+
                                   
                                 });
                                 //make magic happen
@@ -223,6 +238,8 @@ app.get("/fetchDetails", (request, res) => {
 
 
 
+                    }else{
+                        res.send({});
                     }
                 });
 
