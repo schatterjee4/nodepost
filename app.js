@@ -1,7 +1,7 @@
 var express = require("express");
 var app = express();
 const path = require('path');
-var request = require('request');
+var requestObj = require('request');
 //var qs = require('querystring');
 var tunnel = require('tunnel-ssh');
 var bodyParser = require('body-parser');
@@ -9,7 +9,7 @@ var port = 3000;
 var randomstring = require("randomstring");
 var dateTime = require('node-datetime');
 
-app.use(function (req, res, next) {
+app.use(function(req, res, next) {
     res.header("Access-Control-Allow-Origin", "*");
     res.header("Access-Control-Allow-Headers", "Origin, X-Requested-With, Content-Type, Accept");
     next();
@@ -19,7 +19,6 @@ app.get("/", (req, res) => {
 });
 var mongoose = require("mongoose");
 mongoose.Promise = global.Promise;
-
 app.use(bodyParser.json())
 
 var Schema = mongoose.Schema;
@@ -72,7 +71,7 @@ var RMS_TRAVEL = mongoose.model("RMS_TRAVEL", travelSchema);
 global.db = null;
 
 //function createConnect() {
-var server = tunnel(config, function (error, server) {
+var server = tunnel(config, function(error, server) {
     if (error) {
         console.log("SSH connection error: " + error);
     }
@@ -102,11 +101,11 @@ app.post("/storeData", (request, res) => {
             console.log(formatted);
             let paxArray = request.body.paxArray;
             let user1 = "";
-            paxArray.forEach(function (pax) {
+            paxArray.forEach(function(pax) {
                 pax['ticketNumber'] = randomstring.generate(12);
             });
 
-            RMS_USER.insertMany(paxArray, function (err, docs) {
+            RMS_USER.insertMany(paxArray, function(err, docs) {
                 if (err) {
                     return console.error(err);
                 } else {
@@ -114,7 +113,7 @@ app.post("/storeData", (request, res) => {
                     console.log(docs);
                     user1 = docs[0];
                     let idArr = [];
-                    docs.forEach(function (pax) {
+                    docs.forEach(function(pax) {
                         idArr.push(pax._id);
                     });
                     var travel = new RMS_TRAVEL({
@@ -138,7 +137,7 @@ app.post("/storeData", (request, res) => {
                         fop: "cc",
                         serviceClass: "E"
                     });
-                    db.collection('RMS_TRAVEL').insertOne(travel, function (err, doctravel) {
+                    db.collection('RMS_TRAVEL').insertOne(travel, function(err, doctravel) {
                         if (err) {
                             return console.error(err);
                         } else {
@@ -175,7 +174,7 @@ app.post("/storeData", (request, res) => {
             email: "abc@cognizant.com",
             dob: "01/01/01"
         });*/
-        request.on('end', function () {
+        request.on('end', function() {
 
             //console.log(request.body) // populated!
         });
@@ -191,20 +190,20 @@ app.get("/fetchDetails", (request, res) => {
     var pnrString = request.query.pnr;
 
 
-    db.collection('RMS_TRAVEL').findOne({ 'pnr': pnrString }, function (err, travel) {
+    db.collection('RMS_TRAVEL').findOne({ 'pnr': { $regex: new RegExp("^" + pnrString, "i") } }, function(err, travel) {
         if (err) return handleError(err);
         else {
             var useridArr = travel.userids;
             console.log(useridArr);
             let foundMatch = false;
-            useridArr.forEach(function (id) {
-                RMS_USER.findOne({ 'lastName': lname, '_id': id }, function (err, user) {
+            useridArr.forEach(function(id) {
+                RMS_USER.findOne({ 'lastName': lname, '_id': id }, function(err, user) {
                     if (err) return handleError(err);
                     if (user != null) {
                         const userArr = RMS_USER.find()
                             .where('_id')
                             .in(useridArr)
-                            .exec(function (err, docs) {
+                            .exec(function(err, docs) {
                                 console.log(travel);
                                 res.send({
                                     users: docs,
@@ -257,13 +256,13 @@ app.get("/fetchRefundAmount", (request, res) => {
 
 
     var body = '';
-    request.on('data', function (data) {
+    request.on('data', function(data) {
         if (body.length > 1e6) {
             // FLOOD ATTACK OR FAULTY CLIENT, NUKE REQUEST
             request.connection.destroy();
         }
     });
-    request.on('end', function () {
+    request.on('end', function() {
 
 
         fetchRefundAmount(request, res);
@@ -278,20 +277,20 @@ const fetchRefundAmount = (request, res) => {
 
     var lname = request.query.lastName;
     var pnrString = request.query.pnr;
-    db.collection('RMS_TRAVEL').findOne({ 'pnr': pnrString }, function (err, travel) {
+    db.collection('RMS_TRAVEL').findOne({ 'pnr': { $regex: new RegExp("^" + pnrString, "i") } }, function(err, travel) {
         if (err) return handleError(err);
         else {
             var useridArr = travel.userids;
             console.log(useridArr);
             let foundMatch = false;
-            useridArr.forEach(function (id) {
-                RMS_USER.findOne({ 'lastName': lname, '_id': id }, function (err, user) {
+            useridArr.forEach(function(id) {
+                RMS_USER.findOne({ 'lastName': lname, '_id': id }, function(err, user) {
                     if (err) return handleError(err);
                     if (user != null) {
                         const userArr = RMS_USER.find()
                             .where('_id')
                             .in(useridArr)
-                            .exec(function (err, docs) {
+                            .exec(function(err, docs) {
                                 console.log(travel);
                                 let frequentFlyerNumber = '1';
                                 let tamountPaid = travel.price + travel.taxAirport + travel.taxFuel + travel.chargeService + travel.feesDevelopment;
@@ -312,17 +311,17 @@ const fetchRefundAmount = (request, res) => {
                                 };
 
 
-                                
-                                request({
+
+                                requestObj({
                                     url: "http://myruleapi.azurewebsites.net/api/rules",
                                     method: "POST",
                                     headers: {
                                         "content-type": "application/json",
                                     },
                                     json: requestData
-                                    //  body: JSON.stringify(requestData)
-                                }, function (err, response, body) {
-                                  
+                                        //  body: JSON.stringify(requestData)
+                                }, function(err, response, body) {
+
                                     console.log(body.CancellationCharge);
                                     res.send({
                                         cancellationCharge: body.CancellationCharge,
@@ -349,8 +348,8 @@ const fetchRefundAmount = (request, res) => {
 
 
 }
-var gracefulExit = function () {
-    mongoose.connection.close(function () {
+var gracefulExit = function() {
+    mongoose.connection.close(function() {
         console.log('Mongoose default connection with DB :' + db + ' is disconnected through app termination');
         process.exit(0);
     });
