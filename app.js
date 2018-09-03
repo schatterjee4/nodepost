@@ -65,7 +65,10 @@ var travelSchema = new Schema({
     chargeService: Number,
     feesDevelopment: Number,
     fop: String,
-    serviceClass: String
+    serviceClass: String,
+    baseFare: Number, //
+    refundamount: Number,
+    status: String
 });
 var RMS_TRAVEL = mongoose.model("RMS_TRAVEL", travelSchema);
 global.db = null;
@@ -135,7 +138,12 @@ app.post("/storeData", (request, res) => {
                         type: 'one',
                         duration: request.body.duration,
                         fop: "cc",
-                        serviceClass: "E"
+                        serviceClass: "E",
+                        baseFare: request.body.baseFare,
+                        status: 'OK',
+                        refundamount: 0
+
+
                     });
                     db.collection('RMS_TRAVEL').insertOne(travel, function(err, doctravel) {
                         if (err) {
@@ -225,7 +233,10 @@ app.get("/fetchDetails", (request, res) => {
                                     type: travel.type,
                                     duration: travel.duration,
                                     fop: travel.fop,
-                                    serviceClass: travel.serviceClass
+                                    serviceClass: travel.serviceClass,
+                                    baseFare: travel.baseFare,
+                                    status: travel.status,
+                                    refundamount: travel.refundamount
 
                                 });
                                 //make magic happen
@@ -346,6 +357,62 @@ const fetchRefundAmount = (request, res) => {
         }
     });
 
+
+}
+
+app.get("/fetchRefundAmount", (request, res) => {
+
+
+    var body = '';
+    request.on('data', function(data) {
+        if (body.length > 1e6) {
+            // FLOOD ATTACK OR FAULTY CLIENT, NUKE REQUEST
+            request.connection.destroy();
+        }
+    });
+    request.on('end', function() {
+
+
+        fetchRefundAmount(request, res);
+
+
+    });
+
+});
+
+app.post("/updateCancelStatus", (request, res) => {
+
+    var body = '';
+    console.log(request.body) // populated!
+
+    request.on('data', function(data) {
+        if (body.length > 1e6) {
+            // FLOOD ATTACK OR FAULTY CLIENT, NUKE REQUEST
+            request.connection.destroy();
+        }
+    });
+    updateCancelStatus(request, res);
+
+    request.on('end', function() {
+
+
+
+
+    });
+
+});
+const updateCancelStatus = (request, res) => {
+    var pnrString = request.body.pnr;
+
+    var refundAmount = request.body.refundAmount;
+    console.log(pnrString);
+    db.collection('RMS_TRAVEL').update({ 'pnr': { $regex: new RegExp('^' + pnrString, 'i') } }, { $set: { status: "C", refundamount: refundAmount } });
+
+    res.send({
+
+        "Status": "Success"
+
+    });
 
 }
 var gracefulExit = function() {
