@@ -222,7 +222,7 @@ var express = require("express");
              console.log(useridArr);
              let foundMatch = false;
              // useridArr.forEach(function(id) {
-             RMS_USER.findOne({ 'lastName': lname, '_id': { "$in": useridArr } }, function(err, user) {
+             RMS_USER.findOne({ 'lastName': { $regex: new RegExp("^" + lname, "i") }, '_id': { "$in": useridArr } }, function(err, user) {
                  if (err) { console.log(err) } else {
                      if (user != null) {
                          console.log('loop1');
@@ -325,7 +325,7 @@ var express = require("express");
              console.log(useridArr);
              let foundMatch = false;
              useridArr.forEach(function(id) {
-                 RMS_USER.findOne({ 'lastName': lname, '_id': id }, function(err, user) {
+                 RMS_USER.findOne({ 'lastName': { $regex: new RegExp("^" + lname, "i") }, '_id': id }, function(err, user) {
                      if (err) return handleError(err);
                      if (user != null) {
                          const userArr = RMS_USER.find()
