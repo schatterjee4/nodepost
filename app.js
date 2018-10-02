@@ -516,8 +516,8 @@ console.log("kkkkkkkkk");
             db.collection('RMS_TRAVEL').update({ 'pnr': { $regex: new RegExp('^' + pnrString, 'i') } }, { $set: { price: amount } });
             res.send({
 
-                "status": "Success"
-
+                "status": "Success",
+ "price":amount
             });
         }
     });
