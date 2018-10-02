@@ -480,6 +480,47 @@ const fetchConfig = (request, res) => {
         });
 
     });
+}
+app.post("/updateReisueAmount", (request, res) => {
+
+    var body = '';
+    console.log(request.body) // populated!
+
+    request.on('data', function(data) {
+        if (body.length > 1e6) {
+            // FLOOD ATTACK OR FAULTY CLIENT, NUKE REQUEST
+            request.connection.destroy();
+        }
+    });
+    updateReisueAmount(request, res);
+
+    request.on('end', function() {
+
+
+
+
+    });
+
+});
+const updateReisueAmount = (request, res) => {
+    var pnrString = request.body.pnr;
+console.log("kkkkkkkkk");
+    var reissueAmount = request.body.reissueAmount;
+    var amount = 0;
+    db.collection('RMS_TRAVEL').findOne({ 'pnr': { $regex: new RegExp("^" + pnrString, "i") } }, function(err, travel) {
+        if (err) return handleError(err);
+        else {
+            amount = travel.price * 1 + reissueAmount * 1;
+            console.log("kk"+travel.price);
+            console.log(amount);
+            db.collection('RMS_TRAVEL').update({ 'pnr': { $regex: new RegExp('^' + pnrString, 'i') } }, { $set: { price: amount } });
+            res.send({
+
+                "status": "Success"
+
+            });
+        }
+    });
 
 
 }
