@@ -324,64 +324,74 @@ const fetchRefundAmount = (request, res) => {
             var useridArr = travel.userids;
             console.log(useridArr);
             let foundMatch = false;
-            //useridArr.forEach(function(id) {
-            RMS_USER.findOne({ 'lastName': { $regex: new RegExp("^" + lname, "i") }, '_id': { "$in": useridArr } }, function(err, user) {
-                if (err) return handleError(err);
-                if (user != null) {
-                    const userArr = RMS_USER.find()
-                        .where('_id')
-                        .in(useridArr)
-                        .exec(function(err, docs) {
-                            console.log(travel);
-                            let frequentFlyerNumber = '1';
-                            let tamountPaid = travel.price + travel.taxAirport + travel.taxFuel + travel.chargeService + travel.feesDevelopment;
-                            var tvDate = new Date(travel.traveldate);
-                            var currntDate = new Date();
-                            var oneDay = 24 * 60 * 60 * 1000;
-                            var diffDays = Math.round(Math.abs((tvDate.getTime() - currntDate.getTime()) / (oneDay)));
-                            //let serviceClass = travel.serviceClass;
-                            let serviceClass = 'E';
+            useridArr.forEach(function(id) {
+                RMS_USER.findOne({ 'lastName': lname, '_id': id }, function(err, user) {
+                    if (err) return handleError(err);
+                    if (user != null) {
+                        const userArr = RMS_USER.find()
+                            .where('_id')
+                            .in(useridArr)
+                            .exec(function(err, docs) {
+                                let frequentFlyerNumber = '1';
+                                let tamountPaid = travel.price + travel.taxAirport + travel.taxFuel + travel.chargeService + travel.feesDevelopment;
+                                var tvDate = new Date(travel.traveldate);
+                                var bookingDate = new Date(travel.bookingDate);
+
+                                var currntDate = new Date();
+                                var oneDay = 24 * 60 * 60 * 1000;
+                                var diffDays = Math.round(Math.abs((tvDate.getTime() - currntDate.getTime()) / (oneDay))) * 1;
 
 
-
-                            var requestData = {
-                                "FrequentFlyerType": frequentFlyerNumber,
-                                "TotalAmountPaid": tamountPaid,
-                                "TimeRemainingInJourney": diffDays,
-                                "ServiceClass": serviceClass
-                            };
+                                var diffDaysbooking = Math.round(Math.abs((currntDate.getTime() - bookingDate.getTime()) / (oneDay))) * 1;
 
 
+                                //let serviceClass = travel.serviceClass;
+                                let serviceClass = 'E';
 
-                            requestObj({
-                                url: "https://myruleenginewebapi20180912041304.azurewebsites.net/api/rules",
-                                method: "POST",
-                                headers: {
-                                    "content-type": "application/json",
-                                },
-                                json: requestData
-                                    //  body: JSON.stringify(requestData)
-                            }, function(err, response, body) {
-                                console.log(body.CancellationCharge);
-                                res.send({
-                                    cancellationCharge: body.CancellationCharge,
-                                    refundAmount: body.RefundAmount
+                                var requestData = {
+                                    "FrequentFlyerType": frequentFlyerNumber,
+                                    "TotalAmountPaid": travel.price,
+                                    "TimeRemainingInJourney": diffDays,
+                                    "ServiceClass": serviceClass
+                                };
+
+                                requestObj({
+                                    url: "https://myruleenginewebapi20180912041304.azurewebsites.net/api/rules",
+                                    method: "POST",
+                                    headers: {
+                                        "content-type": "application/json",
+                                    },
+                                    json: requestData
+                                        //  body: JSON.stringify(requestData)
+                                }, function(err, response, body) {
+                                    console.log(diffDays <= 15);
+                                    let refndAmount = body.RefundAmount;
+                                    let fullFlag = false;
+                                    if (diffDaysbooking == '0') {
+                                        refndAmount = travel.price;
+                                        fullFlag = true;
+
+                                    } else if (diffDays <= 15) {
+                                        refndAmount = 0;
+                                    }
+                                    res.send({
+                                        cancellationCharge: body.ConvenienceFee,
+                                        refundAmount: refndAmount,
+                                        fullrefund: fullFlag
+                                    });
                                 });
+                                //make magic happen
                             });
-                            //make magic happen
-                        });
-                    /*db.collection('RMS_USER').find({ '_id': { '$in': ['5b82f90a2b75db011cffc5b7, 5b82f90a2b75db011cffc5b8'] } }).toArray(function(err, docs) {
-                        // docs array here contains all queried docs
-                        if (err) throw err;
-                        console.log(docs);
-                    });*/
+                        /*db.collection('RMS_USER').find({ '_id': { '$in': ['5b82f90a2b75db011cffc5b7, 5b82f90a2b75db011cffc5b8'] } }).toArray(function(err, docs) {
+                            // docs array here contains all queried docs
+                            if (err) throw err;
+                            console.log(docs);
+                        });*/
 
+                    }
+                });
 
-
-                }
             });
-
-            //});
 
         }
     });
@@ -504,26 +514,38 @@ app.post("/updateReisueAmount", (request, res) => {
 });
 const updateReisueAmount = (request, res) => {
     var pnrString = request.body.pnr;
-console.log("kkkkkkkkk");
+    console.log("kkkkkkkkk");
     var reissueAmount = request.body.reissueAmount;
     var amount = 0;
     db.collection('RMS_TRAVEL').findOne({ 'pnr': { $regex: new RegExp("^" + pnrString, "i") } }, function(err, travel) {
         if (err) return handleError(err);
         else {
             amount = travel.price * 1 + reissueAmount * 1;
-            console.log("kk"+travel.price);
+            console.log("kk" + travel.price);
             console.log(amount);
             db.collection('RMS_TRAVEL').update({ 'pnr': { $regex: new RegExp('^' + pnrString, 'i') } }, { $set: { price: amount } });
             res.send({
 
                 "status": "Success",
- "price":amount
+                "price": amount
             });
         }
     });
 
 
 }
+const _MS_PER_DAY = 1000 * 60 * 60 * 24;
+
+// a and b are javascript Date objects
+function dateDiffInDays(a, b) {
+    // Discard the time and time-zone information.
+    const utc1 = Date.UTC(a.getFullYear(), a.getMonth(), a.getDate());
+    const utc2 = Date.UTC(b.getFullYear(), b.getMonth(), b.getDate());
+
+    return Math.floor((utc2 - utc1) / _MS_PER_DAY);
+}
+
+
 var gracefulExit = function() {
     mongoose.connection.close(function() {
         console.log('Mongoose default connection with DB :' + db + ' is disconnected through app termination');
